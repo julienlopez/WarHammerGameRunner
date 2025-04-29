@@ -1,18 +1,22 @@
 use dioxus::prelude::*;
 
+use ui::battle_details::BattleDetails;
+
+pub mod army_rules;
+use crate::army_rules::{generate_army_rules, ArmyRules};
+
+pub mod ui;
+use crate::ui::state::State;
+
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
 enum Route {
-    #[layout(Navbar)]
     #[route("/")]
     Home {},
-    #[route("/blog/:id")]
-    Blog { id: i32 },
 }
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
 const MAIN_CSS: Asset = asset!("/assets/main.css");
-const HEADER_SVG: Asset = asset!("/assets/header.svg");
 
 fn main() {
     dioxus::launch(App);
@@ -20,7 +24,15 @@ fn main() {
 
 #[component]
 fn App() -> Element {
+    use_context_provider(|| Signal::new(State::NotStarted));
+    use_context_provider(|| Signal::new(generate_army_rules()));
     rsx! {
+        link {
+            rel: "stylesheet",
+            href: "https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/pure-min.css",
+            integrity: "sha384-X38yfunGUhNzHpBaEBsWLO+A0HDYOQi8ufWDkZ0k9e0eXz/tH3II7uKZ9msv++Ls",
+            crossorigin: "anonymous",
+        }
         document::Link { rel: "icon", href: FAVICON }
         document::Link { rel: "stylesheet", href: MAIN_CSS }
         Router::<Route> {}
@@ -28,73 +40,42 @@ fn App() -> Element {
 }
 
 #[component]
-pub fn Hero() -> Element {
-    rsx! {
-        div {
-            id: "hero",
-            img { src: HEADER_SVG, id: "header" }
-            div { id: "links",
-                a { href: "https://dioxuslabs.com/learn/0.6/", "📚 Learn Dioxus" }
-                a { href: "https://dioxuslabs.com/awesome", "🚀 Awesome Dioxus" }
-                a { href: "https://github.com/dioxus-community/", "📡 Community Libraries" }
-                a { href: "https://github.com/DioxusLabs/sdk", "⚙️ Dioxus Development Kit" }
-                a { href: "https://marketplace.visualstudio.com/items?itemName=DioxusLabs.dioxus", "💫 VSCode Extension" }
-                a { href: "https://discord.gg/XgGxMSkvUM", "👋 Community Discord" }
-            }
-        }
-    }
-}
-
-/// Home page
-#[component]
 fn Home() -> Element {
-    rsx! {
-        Hero {}
-
-    }
-}
-
-/// Blog page
-#[component]
-pub fn Blog(id: i32) -> Element {
-    rsx! {
-        div {
-            id: "blog",
-
-            // Content
-            h1 { "This is blog #{id}!" }
-            p { "In blog #{id}, we show how the Dioxus router works and how URL parameters can be passed as props to our route components." }
-
-            // Navigation links
-            Link {
-                to: Route::Blog { id: id - 1 },
-                "Previous"
+    match *use_context::<Signal<State>>().read() {
+        State::NotStarted => {
+            rsx! {
+                StartingScreen {}
             }
-            span { " <---> " }
-            Link {
-                to: Route::Blog { id: id + 1 },
-                "Next"
+        }
+        State::ArmySelection => {
+            rsx! {
+                crate::ui::army_selector::ArmySelector {}
             }
+        }
+        State::DetachmentSelection { p1_army, p2_army } => {
+            rsx!(crate::ui::detachment_selector::DetachmentSelector {
+                p1_army_index: p1_army,
+                p2_army_index: p2_army
+            })
+        }
+        State::Details { player_1, player_2 } => {
+            rsx!(crate::ui::battle_details::BattleDetails { player_1, player_2 })
         }
     }
 }
 
-/// Shared navbar component.
 #[component]
-fn Navbar() -> Element {
-    rsx! {
-        div {
-            id: "navbar",
-            Link {
-                to: Route::Home {},
-                "Home"
-            }
-            Link {
-                to: Route::Blog { id: 1 },
-                "Blog"
+fn StartingScreen() -> Element {
+    rsx!(
+        div { class: "main_screen", id: "starting_screen",
+            div {
+                id: "start_game_button",
+                class: "button-xlarge pure-button",
+                onclick: |_| {
+                    *use_context::<Signal<State>>().write() = State::ArmySelection;
+                },
+                "Start new game!"
             }
         }
-
-        Outlet::<Route> {}
-    }
+    )
 }
